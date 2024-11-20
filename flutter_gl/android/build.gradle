@@ -48,7 +48,13 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
-
+     bundle {
+        aar {
+            // 로컬 AAR 파일을 포함하도록 설정
+            includeLibraryResourcesAndManifests = true
+            pickFirsts = ['META-INF/MANIFEST.MF']
+        }
+    }
 }
 
 dependencies {
