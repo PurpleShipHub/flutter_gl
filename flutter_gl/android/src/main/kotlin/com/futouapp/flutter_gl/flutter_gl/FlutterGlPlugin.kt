@@ -17,28 +17,47 @@ class FlutterGlPlugin : FlutterPlugin, MethodCallHandler {
     private var renders = mutableMapOf<Int, CustomRender>()
     private val TAG = "FlutterGlPlugin"
 
+    override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        Log.e(TAG, "Attaching to engine")
+        channel = MethodChannel(binding.binaryMessenger, "flutter_gl")
+        channel.setMethodCallHandler(this)
+        registry = binding.textureRegistry
+        context = binding.applicationContext
+        Log.e(TAG, "Successfully attached to engine")
+    }
+
     override fun onMethodCall(call: MethodCall, result: Result) {
-        Log.d(TAG, """
-            ====== Method Call Debug ======
+        // 가장 먼저 로그 출력
+        Log.e(TAG, """
+            ======== Method Call Debug ========
             Method: ${call.method}
-            Arguments: ${call.arguments}
+            Raw Arguments: ${call.arguments}
             Arguments Type: ${call.arguments?.javaClass}
-            Arguments Content: ${call.arguments?.toString()}
-            =============================
+            ================================
         """.trimIndent())
 
         try {
+            // 40번 라인 이전에 추가 로그
+            if (call.arguments != null) {
+                Log.e(TAG, """
+                    ======== Arguments Detail ========
+                    Arguments Keys: ${(call.arguments as? Map<*, *>)?.keys}
+                    Arguments Values: ${(call.arguments as? Map<*, *>)?.values}
+                    ================================
+                """.trimIndent())
+            }
+
             when (call.method) {
                 "getPlatformVersion" -> {
-                    Log.d(TAG, "Handling getPlatformVersion")
+                    Log.e(TAG, "Handling getPlatformVersion")
                     result.success("Android ${android.os.Build.VERSION.RELEASE}")
                 }
                 "initialize" -> {
-                    Log.d(TAG, "Handling initialize")
+                    Log.e(TAG, "Handling initialize")
                     val args = (call.arguments as Map<*, *>).mapKeys { it.key as String }
                     val options = (args["options"] as Map<*, *>?)!!.mapKeys { it.key as String }
                     
-                    Log.d(TAG, """
+                    Log.e(TAG, """
                         Initialize Details:
                         Args: $args
                         Options: $options
@@ -50,12 +69,12 @@ class FlutterGlPlugin : FlutterPlugin, MethodCallHandler {
                     val glWidth = ((options["width"] as Int) * (options["dpr"] as Double)).toInt()
                     val glHeight = ((options["height"] as Int) * (options["dpr"] as Double)).toInt()
 
-                    Log.d(TAG, "Calculated dimensions - Width: $glWidth, Height: $glHeight")
+                    Log.e(TAG, "Calculated dimensions - Width: $glWidth, Height: $glHeight")
 
                     val entry = registry.createSurfaceTexture()
                     val textureID = entry.id().toInt()
                     
-                    Log.d(TAG, "Created texture with ID: $textureID")
+                    Log.e(TAG, "Created texture with ID: $textureID")
 
                     val render = CustomRender(entry, glWidth, glHeight)
                     renders[textureID] = render
@@ -63,78 +82,80 @@ class FlutterGlPlugin : FlutterPlugin, MethodCallHandler {
                     result.success(mapOf("textureId" to textureID))
                 }
                 "getEgl" -> {
-                    Log.d(TAG, "Handling getEgl")
+                    Log.e(TAG, "Handling getEgl")
                     val args = (call.arguments as Map<*, *>).mapKeys { it.key as String }
                     val textureId = args["textureId"] as Int
                     
-                    Log.d(TAG, "GetEgl for textureId: $textureId")
+                    Log.e(TAG, "GetEgl for textureId: $textureId")
 
                     val render = this.renders[textureId]
                     val eglResult = render?.getEgl()
                     
-                    Log.d(TAG, "EGL Result: $eglResult")
+                    Log.e(TAG, "EGL Result: $eglResult")
                     result.success(eglResult)
                 }
                 "updateTexture" -> {
-                    Log.d(TAG, "Handling updateTexture")
+                    Log.e(TAG, "Handling updateTexture")
                     val args = (call.arguments as Map<*, *>).mapKeys { it.key as String }
                     val textureId = args["textureId"] as Int
                     val sourceTexture = args["sourceTexture"] as Int
                     
-                    Log.d(TAG, """
+                    Log.e(TAG, """
                         UpdateTexture Details:
                         TextureId: $textureId
                         SourceTexture: $sourceTexture
                     """.trimIndent())
 
                     val resp = this.renders[textureId]?.updateTexture(sourceTexture)
-                    Log.d(TAG, "UpdateTexture Response: $resp")
+                    Log.e(TAG, "UpdateTexture Response: $resp")
                     result.success(resp)
                 }
                 "dispose" -> {
-                    Log.d(TAG, "Handling dispose")
+                    Log.e(TAG, "Handling dispose")
                     val args = (call.arguments as Map<*, *>).mapKeys { it.key as String }
                     val textureId = args["textureId"] as? Int
                     
-                    Log.d(TAG, "Disposing textureId: $textureId")
+                    Log.e(TAG, "Disposing textureId: $textureId")
 
                     if (textureId != null) {
                         val render = this.renders[textureId]
                         render?.dispose()
                         this.renders.remove(textureId)
-                        Log.d(TAG, "Successfully disposed texture: $textureId")
+                        Log.e(TAG, "Successfully disposed texture: $textureId")
                     }
 
                     result.success(null)
                 }
                 else -> {
-                    Log.d(TAG, "Method not implemented: ${call.method}")
+                    Log.e(TAG, "Method not implemented: ${call.method}")
                     result.notImplemented()
                 }
             }
         } catch (e: Exception) {
             Log.e(TAG, """
-                Error in ${call.method}:
-                Error Type: ${e.javaClass.simpleName}
-                Message: ${e.message}
-                Stack Trace: ${e.stackTraceToString()}
+                ======== Error Detail ========
+                Error in method: ${call.method}
+                Error type: ${e.javaClass.simpleName}
+                Error message: ${e.message}
+                Stack trace: ${e.stackTraceToString()}
+                ============================
             """.trimIndent())
             throw e
         }
     }
 
-    override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
-        Log.d(TAG, "Attaching to engine")
-        channel = MethodChannel(binding.binaryMessenger, "flutter_gl")
-        channel.setMethodCallHandler(this)
-        registry = binding.textureRegistry
-        context = binding.applicationContext
-        Log.d(TAG, "Successfully attached to engine")
-    }
-
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
-        Log.d(TAG, "Detaching from engine")
+        Log.e(TAG, "Detaching from engine")
         channel.setMethodCallHandler(null)
-        Log.d(TAG, "Successfully detached from engine")
+        renders.forEach { (id, render) ->
+            try {
+                render.dispose()
+                Log.e(TAG, "Disposed render for textureId: $id")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error disposing render $id: ${e.message}")
+            }
+        }
+        renders.clear()
+        Log.e(TAG, "Successfully detached from engine")
     }
 }
