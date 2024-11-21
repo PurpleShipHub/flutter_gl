@@ -33,40 +33,43 @@ class FlutterGlPlugin : FlutterPlugin, MethodCallHandler {
     @Suppress("UNCHECKED_CAST")
     override fun onMethodCall(call: MethodCall, result: Result) {
         try {
-            Log.d(TAG, "Method called: ${call.method}")
+            Log.d(TAG, "Method called: ${call.method} with arguments: ${call.arguments}")
             
-            // 먼저 arguments가 null이 아닌지 확인
-            if (call.arguments == null && call.method != "getPlatformVersion") {
-                throw IllegalArgumentException("Arguments cannot be null")
-            }
-
             when (call.method) {
                 "getPlatformVersion" -> {
                     result.success("Android ${android.os.Build.VERSION.RELEASE}")
+                    return
                 }
-                "initialize" -> {
-                    val args = call.arguments as? Map<String, Any> 
-                        ?: throw IllegalArgumentException("Invalid arguments type for initialize")
-                    handleInitialize(args, result)
+            }
+
+            // 여기서 arguments가 null인지 체크
+            if (call.arguments == null) {
+                throw IllegalArgumentException("Arguments cannot be null for method: ${call.method}")
+            }
+
+            // Map으로 안전하게 캐스팅
+            val arguments = try {
+                when (val args = call.arguments) {
+                    is Map<*, *> -> args.mapValues { (_, value) ->
+                        when (value) {
+                            is Number -> value
+                            is Map<*, *> -> value.mapValues { it.value }
+                            else -> value
+                        }
+                    }
+                    else -> throw IllegalArgumentException("Arguments must be a Map")
                 }
-                "getEgl" -> {
-                    val args = call.arguments as? Map<String, Any> 
-                        ?: throw IllegalArgumentException("Invalid arguments type for getEgl")
-                    handleGetEgl(args, result)
-                }
-                "updateTexture" -> {
-                    val args = call.arguments as? Map<String, Any> 
-                        ?: throw IllegalArgumentException("Invalid arguments type for updateTexture")
-                    handleUpdateTexture(args, result)
-                }
-                "dispose" -> {
-                    val args = call.arguments as? Map<String, Any> 
-                        ?: throw IllegalArgumentException("Invalid arguments type for dispose")
-                    handleDispose(args, result)
-                }
-                else -> {
-                    result.notImplemented()
-                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error parsing arguments: ${e.message}")
+                throw IllegalArgumentException("Invalid arguments format: ${e.message}")
+            }
+
+            when (call.method) {
+                "initialize" -> handleInitialize(arguments, result)
+                "getEgl" -> handleGetEgl(arguments, result)
+                "updateTexture" -> handleUpdateTexture(arguments, result)
+                "dispose" -> handleDispose(arguments, result)
+                else -> result.notImplemented()
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error in method ${call.method}: ${e.message}", e)
@@ -78,19 +81,28 @@ class FlutterGlPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
-    private fun handleInitialize(args: Map<String, Any>, result: Result) {
+    private fun handleInitialize(args: Map<*, *>, result: Result) {
         try {
             Log.d(TAG, "Handling initialize with args: $args")
             
-            val options = args["options"] as? Map<String, Any> 
+            val options = args["options"] as? Map<*, *> 
                 ?: throw IllegalArgumentException("Options must be a Map")
 
-            // Null 안전성을 위해 기본값 제공
-            val width = (options["width"] as? Number)?.toInt() 
-                ?: throw IllegalArgumentException("Width is required and must be a number")
-            val height = (options["height"] as? Number)?.toInt() 
-                ?: throw IllegalArgumentException("Height is required and must be a number")
-            val dpr = (options["dpr"] as? Number)?.toDouble() ?: 1.0
+            val width = when (val w = options["width"]) {
+                is Number -> w.toInt()
+                else -> throw IllegalArgumentException("Width must be a number, got: $w")
+            }
+
+            val height = when (val h = options["height"]) {
+                is Number -> h.toInt()
+                else -> throw IllegalArgumentException("Height must be a number, got: $h")
+            }
+
+            val dpr = when (val d = options["dpr"]) {
+                is Number -> d.toDouble()
+                null -> 1.0
+                else -> throw IllegalArgumentException("DPR must be a number, got: $d")
+            }
 
             val glWidth = (width * dpr).toInt()
             val glHeight = (height * dpr).toInt()
@@ -110,10 +122,12 @@ class FlutterGlPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
-    private fun handleGetEgl(args: Map<String, Any>, result: Result) {
+    private fun handleGetEgl(args: Map<*, *>, result: Result) {
         try {
-            val textureId = (args["textureId"] as? Number)?.toInt() 
-                ?: throw IllegalArgumentException("TextureId must be a number")
+            val textureId = when (val id = args["textureId"]) {
+                is Number -> id.toInt()
+                else -> throw IllegalArgumentException("TextureId must be a number, got: $id")
+            }
 
             val render = renders[textureId] 
                 ?: throw IllegalStateException("No render found for texture ID: $textureId")
@@ -126,12 +140,17 @@ class FlutterGlPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
-    private fun handleUpdateTexture(args: Map<String, Any>, result: Result) {
+    private fun handleUpdateTexture(args: Map<*, *>, result: Result) {
         try {
-            val textureId = (args["textureId"] as? Number)?.toInt() 
-                ?: throw IllegalArgumentException("TextureId must be a number")
-            val sourceTexture = (args["sourceTexture"] as? Number)?.toInt() 
-                ?: throw IllegalArgumentException("SourceTexture must be a number")
+            val textureId = when (val id = args["textureId"]) {
+                is Number -> id.toInt()
+                else -> throw IllegalArgumentException("TextureId must be a number, got: $id")
+            }
+
+            val sourceTexture = when (val src = args["sourceTexture"]) {
+                is Number -> src.toInt()
+                else -> throw IllegalArgumentException("SourceTexture must be a number, got: $src")
+            }
 
             val render = renders[textureId] 
                 ?: throw IllegalStateException("No render found for texture ID: $textureId")
@@ -144,9 +163,13 @@ class FlutterGlPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
-    private fun handleDispose(args: Map<String, Any>, result: Result) {
+    private fun handleDispose(args: Map<*, *>, result: Result) {
         try {
-            val textureId = (args["textureId"] as? Number)?.toInt()
+            val textureId = when (val id = args["textureId"]) {
+                is Number -> id.toInt()
+                null -> null
+                else -> throw IllegalArgumentException("TextureId must be a number or null, got: $id")
+            }
 
             if (textureId != null) {
                 val render = renders[textureId]
@@ -165,7 +188,6 @@ class FlutterGlPlugin : FlutterPlugin, MethodCallHandler {
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         try {
             channel.setMethodCallHandler(null)
-            // Clean up renders
             renders.forEach { (id, render) ->
                 try {
                     render.dispose()
