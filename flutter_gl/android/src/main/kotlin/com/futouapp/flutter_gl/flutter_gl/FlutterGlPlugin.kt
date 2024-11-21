@@ -18,43 +18,44 @@ class FlutterGlPlugin : FlutterPlugin, MethodCallHandler {
     private val TAG = "FlutterGlPlugin"
 
     override fun onMethodCall(call: MethodCall, result: Result) {
+        Log.d(TAG, """
+            ====== Method Call Debug ======
+            Method: ${call.method}
+            Arguments: ${call.arguments}
+            Arguments Type: ${call.arguments?.javaClass}
+            Arguments Content: ${call.arguments?.toString()}
+            =============================
+        """.trimIndent())
+
         try {
-            Log.d(TAG, "Method called: ${call.method} with arguments: ${call.arguments}")
-            
             when (call.method) {
                 "getPlatformVersion" -> {
+                    Log.d(TAG, "Handling getPlatformVersion")
                     result.success("Android ${android.os.Build.VERSION.RELEASE}")
-                    return
                 }
                 "initialize" -> {
-                    // 안전한 타입 캐스팅
-                    val args = call.arguments as? Map<*, *>
-                    if (args == null) {
-                        result.error("INVALID_ARGUMENTS", "Arguments cannot be null", null)
-                        return
-                    }
+                    Log.d(TAG, "Handling initialize")
+                    val args = (call.arguments as Map<*, *>).mapKeys { it.key as String }
+                    val options = (args["options"] as Map<*, *>?)!!.mapKeys { it.key as String }
+                    
+                    Log.d(TAG, """
+                        Initialize Details:
+                        Args: $args
+                        Options: $options
+                        Width: ${options["width"]}
+                        Height: ${options["height"]}
+                        DPR: ${options["dpr"]}
+                    """.trimIndent())
 
-                    val options = args["options"] as? Map<*, *>
-                    if (options == null) {
-                        result.error("INVALID_OPTIONS", "Options cannot be null", null)
-                        return
-                    }
+                    val glWidth = ((options["width"] as Int) * (options["dpr"] as Double)).toInt()
+                    val glHeight = ((options["height"] as Int) * (options["dpr"] as Double)).toInt()
 
-                    // 숫자 타입 안전하게 처리
-                    val width = (options["width"] as? Number)?.toInt()
-                    val height = (options["height"] as? Number)?.toInt()
-                    val dpr = (options["dpr"] as? Number)?.toDouble() ?: 1.0
-
-                    if (width == null || height == null) {
-                        result.error("INVALID_DIMENSIONS", "Width and height must be valid numbers", null)
-                        return
-                    }
-
-                    val glWidth = (width * dpr).toInt()
-                    val glHeight = (height * dpr).toInt()
+                    Log.d(TAG, "Calculated dimensions - Width: $glWidth, Height: $glHeight")
 
                     val entry = registry.createSurfaceTexture()
                     val textureID = entry.id().toInt()
+                    
+                    Log.d(TAG, "Created texture with ID: $textureID")
 
                     val render = CustomRender(entry, glWidth, glHeight)
                     renders[textureID] = render
@@ -62,79 +63,78 @@ class FlutterGlPlugin : FlutterPlugin, MethodCallHandler {
                     result.success(mapOf("textureId" to textureID))
                 }
                 "getEgl" -> {
-                    val args = call.arguments as? Map<*, *>
-                    val textureId = (args?.get("textureId") as? Number)?.toInt()
+                    Log.d(TAG, "Handling getEgl")
+                    val args = (call.arguments as Map<*, *>).mapKeys { it.key as String }
+                    val textureId = args["textureId"] as Int
                     
-                    if (textureId == null) {
-                        result.error("INVALID_TEXTURE_ID", "TextureId must be a valid number", null)
-                        return
-                    }
+                    Log.d(TAG, "GetEgl for textureId: $textureId")
 
-                    val render = renders[textureId]
-                    if (render == null) {
-                        result.error("RENDER_NOT_FOUND", "No render found for textureId: $textureId", null)
-                        return
-                    }
-
-                    result.success(render.getEgl())
+                    val render = this.renders[textureId]
+                    val eglResult = render?.getEgl()
+                    
+                    Log.d(TAG, "EGL Result: $eglResult")
+                    result.success(eglResult)
                 }
                 "updateTexture" -> {
-                    val args = call.arguments as? Map<*, *>
-                    val textureId = (args?.get("textureId") as? Number)?.toInt()
-                    val sourceTexture = (args?.get("sourceTexture") as? Number)?.toInt()
+                    Log.d(TAG, "Handling updateTexture")
+                    val args = (call.arguments as Map<*, *>).mapKeys { it.key as String }
+                    val textureId = args["textureId"] as Int
+                    val sourceTexture = args["sourceTexture"] as Int
                     
-                    if (textureId == null || sourceTexture == null) {
-                        result.error("INVALID_PARAMETERS", "TextureId and sourceTexture must be valid numbers", null)
-                        return
-                    }
+                    Log.d(TAG, """
+                        UpdateTexture Details:
+                        TextureId: $textureId
+                        SourceTexture: $sourceTexture
+                    """.trimIndent())
 
-                    val render = renders[textureId]
-                    if (render == null) {
-                        result.error("RENDER_NOT_FOUND", "No render found for textureId: $textureId", null)
-                        return
-                    }
-
-                    result.success(render.updateTexture(sourceTexture))
+                    val resp = this.renders[textureId]?.updateTexture(sourceTexture)
+                    Log.d(TAG, "UpdateTexture Response: $resp")
+                    result.success(resp)
                 }
                 "dispose" -> {
-                    val args = call.arguments as? Map<*, *>
-                    val textureId = (args?.get("textureId") as? Number)?.toInt()
+                    Log.d(TAG, "Handling dispose")
+                    val args = (call.arguments as Map<*, *>).mapKeys { it.key as String }
+                    val textureId = args["textureId"] as? Int
                     
+                    Log.d(TAG, "Disposing textureId: $textureId")
+
                     if (textureId != null) {
-                        renders[textureId]?.dispose()
-                        renders.remove(textureId)
+                        val render = this.renders[textureId]
+                        render?.dispose()
+                        this.renders.remove(textureId)
+                        Log.d(TAG, "Successfully disposed texture: $textureId")
                     }
-                    
+
                     result.success(null)
                 }
                 else -> {
+                    Log.d(TAG, "Method not implemented: ${call.method}")
                     result.notImplemented()
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error in ${call.method}: ${e.message}", e)
-            result.error(
-                "FLUTTER_GL_ERROR",
-                "Error in ${call.method}: ${e.message}",
-                e.stackTraceToString()
-            )
+            Log.e(TAG, """
+                Error in ${call.method}:
+                Error Type: ${e.javaClass.simpleName}
+                Message: ${e.message}
+                Stack Trace: ${e.stackTraceToString()}
+            """.trimIndent())
+            throw e
         }
     }
 
-    override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
-        channel = MethodChannel(flutterPluginBinding.binaryMessenger, "flutter_gl")
+    override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        Log.d(TAG, "Attaching to engine")
+        channel = MethodChannel(binding.binaryMessenger, "flutter_gl")
         channel.setMethodCallHandler(this)
-        registry = flutterPluginBinding.textureRegistry
-        context = flutterPluginBinding.applicationContext
+        registry = binding.textureRegistry
+        context = binding.applicationContext
+        Log.d(TAG, "Successfully attached to engine")
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
-        try {
-            renders.forEach { (_, render) -> render.dispose() }
-            renders.clear()
-            channel.setMethodCallHandler(null)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error in onDetachedFromEngine: ${e.message}", e)
-        }
+        Log.d(TAG, "Detaching from engine")
+        channel.setMethodCallHandler(null)
+        Log.d(TAG, "Successfully detached from engine")
     }
 }
