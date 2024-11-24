@@ -375,7 +375,7 @@ class OpenGLContextES extends OpenGL30Constant {
     return gl.glBindFramebuffer(v0, v1 ?? 0);
   }
 
-  void checkFramebufferStatus(int v0) {
+  int checkFramebufferStatus(int v0) {
     return gl.glCheckFramebufferStatus(v0);
   }
 
