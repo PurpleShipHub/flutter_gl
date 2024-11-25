@@ -383,12 +383,14 @@ class OpenGLContextES extends OpenGL30Constant {
     return gl.glFramebufferTexture2D(v0, v1, v2, v3, v4);
   }
 
-  void readPixels(int x, int y, int width, int height, int format, int type, NativeArray data) {
-    // if (data is NativeArray) {
+  void readPixels(int x, int y, int width, int height, int format, int type, dynamic data) {
+    if (data is NativeArray) {
       readPixelsNative(x, y, width, height, format, type, data.data.cast<Void>());
-    // } else {
-    //   readPixelsNormal(x, y, width, height, format, type, data);
-    // }
+    } else if (data is Uint8List) {
+      readPixelsNormal(x, y, width, height, format, type, data);
+    } else {
+      throw ("Unsupported data type for readPixels");
+    }
   }
 
   void readPixelsNative(int x, int y, int width, int height, int format, int type,
@@ -588,19 +590,43 @@ class OpenGLContextES extends OpenGL30Constant {
   }
 
   void vertexAttrib2fv(v0, v1) {
-    return gl.glVertexAttrib2fv(v0, v1);
+    if (v1 is NativeArray) {
+      gl.glVertexAttrib2fv(v0, v1.data);
+    } else {
+      var arrayPointer = toPointer(v1);
+      gl.glVertexAttrib2fv(v0, arrayPointer);
+      calloc.free(arrayPointer);
+    }
   }
 
   void vertexAttrib3fv(v0, v1) {
-    return gl.glVertexAttrib3fv(v0, v1);
+    if (v1 is NativeArray) {
+      gl.glVertexAttrib3fv(v0, v1.data);
+    } else {
+      var arrayPointer = toPointer(v1);
+      gl.glVertexAttrib3fv(v0, arrayPointer);
+      calloc.free(arrayPointer);
+    }
   }
 
   void vertexAttrib4fv(v0, v1) {
-    return gl.glVertexAttrib4fv(v0, v1);
+    if (v1 is NativeArray) {
+      gl.glVertexAttrib4fv(v0, v1.data);
+    } else {
+      var arrayPointer = toPointer(v1);
+      gl.glVertexAttrib4fv(v0, arrayPointer);
+      calloc.free(arrayPointer);
+    }
   }
 
   void vertexAttrib1fv(v0, v1) {
-    return gl.glVertexAttrib1fv(v0, v1);
+    if (v1 is NativeArray) {
+      gl.glVertexAttrib1fv(v0, v1.data);
+    } else {
+      var arrayPointer = toPointer(v1);
+      gl.glVertexAttrib1fv(v0, arrayPointer);
+      calloc.free(arrayPointer);
+    }
   }
 
   void drawElements(int mode, int count, int type, int offset) {
@@ -751,27 +777,47 @@ class OpenGLContextES extends OpenGL30Constant {
   }
 
   void uniform1iv(location, value) {
-    int count = value.length;
-    final valuePtr = calloc<Int32>(count);
-    valuePtr.asTypedList(count).setAll(0, value);
-    return gl.glUniform1iv(location, count, valuePtr);
+    if (value is NativeArray) {
+      gl.glUniform1iv(location, value.length, value.data.cast<Int32>());
+    } else {
+      int count = value.length;
+      final valuePtr = calloc<Int32>(count);
+      valuePtr.asTypedList(count).setAll(0, value);
+      gl.glUniform1iv(location, count, valuePtr);
+      calloc.free(valuePtr);
+    }
   }
 
-  void uniform2iv(int location, int count, List<num> value) {
-    int count = 2;
-    final valuePtr = calloc<Int32>(count);
-    valuePtr[0] = value[0].toInt();
-    valuePtr[1] = value[1].toInt();
-
-    return gl.glUniform2iv(location, count, valuePtr);
+  void uniform2iv(int location, value) {
+    if (value is NativeArray) {
+      gl.glUniform2iv(location, 2, value.data.cast<Int32>());
+    } else {
+      final valuePtr = calloc<Int32>(2);
+      valuePtr[0] = value[0].toInt();
+      valuePtr[1] = value[1].toInt();
+      gl.glUniform2iv(location, 2, valuePtr);
+      calloc.free(valuePtr);
+    }
   }
 
   void uniform3iv(v0, v1) {
-    return gl.glUniform3iv(v0, v1);
+    if (v1 is NativeArray) {
+      gl.glUniform3iv(v0, v1.length ~/ 3, v1.data.cast<Int32>());
+    } else {
+      final valuePtr = toPointer(v1);
+      gl.glUniform3iv(v0, v1.length ~/ 3, valuePtr);
+      calloc.free(valuePtr);
+    }
   }
 
   void uniform4iv(v0, v1) {
-    return gl.glUniform4iv(v0, v1);
+    if (v1 is NativeArray) {
+      gl.glUniform4iv(v0, v1.length ~/ 4, v1.data.cast<Int32>());
+    } else {
+      final valuePtr = toPointer(v1);
+      gl.glUniform4iv(v0, v1.length ~/ 4, valuePtr);
+      calloc.free(valuePtr);
+    }
   }
 
   void uniform4fv(location, NativeArray value) {
