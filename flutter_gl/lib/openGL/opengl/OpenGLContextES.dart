@@ -820,8 +820,14 @@ class OpenGLContextES extends OpenGL30Constant {
     }
   }
 
-  void uniform4fv(location, NativeArray value) {
-    return gl.glUniform4fv(location, value.length ~/ 4, value.data.cast<Void>());
+  void uniform4fv(location, value) {
+    if (value is NativeArray) {
+      gl.glUniform4fv(location, value.length ~/ 4, value.data.cast<Void>());
+    } else {
+      final valuePtr = toPointer(value);
+      gl.glUniform4fv(location, value.length ~/ 4, valuePtr);
+      calloc.free(valuePtr);
+    }
   }
 
   void uniform4f(location, num v0, num v1, num v2, num v3) {
