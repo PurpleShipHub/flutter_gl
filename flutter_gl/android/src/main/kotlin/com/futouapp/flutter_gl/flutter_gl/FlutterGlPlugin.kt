@@ -28,9 +28,6 @@ class FlutterGlPlugin : FlutterPlugin, MethodCallHandler {
     }
 
     override fun onMethodCall(call: MethodCall, result: Result) {
-        Log.d(TAG, "Method called: ${call.method}")
-        Log.d(TAG, "Arguments: ${call.arguments}")
-
         try {
             when (call.method) {
                 "getPlatformVersion" -> {
@@ -85,20 +82,16 @@ class FlutterGlPlugin : FlutterPlugin, MethodCallHandler {
                     result.success(eglResult)
                 }
                 "updateTexture" -> {
-                    Log.d(TAG, "Updating texture")
                     val args = call.arguments as? Map<*, *>
                     val textureId = args?.get("textureId") as? Int
                     val sourceTexture = args?.get("sourceTexture") as? Int
                     
-                    Log.d(TAG, "TextureId: $textureId, SourceTexture: $sourceTexture")
-
                     if (textureId == null || sourceTexture == null) {
                         throw IllegalArgumentException("TextureId and sourceTexture must not be null")
                     }
 
                     val render = renders[textureId]
                     val resp = render?.updateTexture(sourceTexture)
-                    Log.d(TAG, "Update response: $resp")
                     result.success(resp)
                 }
                 "dispose" -> {
